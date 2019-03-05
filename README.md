@@ -1,10 +1,10 @@
 Scarecrow Highlighter - 1.0 <br/>
 Show the radius for the scarecrows effectiveness
 
-:: REQUIREMENTS ::
+:: REQUIREMENTS :: <br/>
 • SMAPI v2.11
 
-:: FEATURES ::
+:: FEATURES :: <br/>
 • Highlight on hovering over scarecrow <br/>
 • Highlight on holding scarecrow <br/>
 • Highlight on button toggle <br/>
