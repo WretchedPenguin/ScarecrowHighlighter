@@ -9,6 +9,6 @@ Show the radius for the scarecrows effectiveness
 • Highlight on holding scarecrow <br/>
 • Highlight on button toggle <br/>
 
-:: GENERAL OTHER STUFF ::
+:: GENERAL OTHER STUFF ::<br/>
 • Check releases tab on Github to download mod  <br/>
 • Check out source at https://github.com/WretchedPenguin/ScarecrowHighlighter
