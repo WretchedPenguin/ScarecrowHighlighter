@@ -15,7 +15,6 @@ namespace ScarecrowHighlighter
     public class ScarecrowHighlighterMod : Mod
     {
         private bool hovering;
-        private bool holding;
         private bool pressed;
 
         private Texture2D tileTexture;
@@ -23,6 +22,7 @@ namespace ScarecrowHighlighter
         private ModConfig config;
 
         private HighlightedDrawer drawer;
+        private readonly Dictionary<Object, int> itemsToHighlight = new Dictionary<Object, int>();
 
         public override void Entry(IModHelper helper)
         {
@@ -35,19 +35,23 @@ namespace ScarecrowHighlighter
             helper.Events.Display.RenderedWorld += DisplayOnRenderedWorld;
             helper.Events.World.ObjectListChanged += WorldOnObjectListChanged;
             helper.Events.Player.Warped += PlayerOnWarped;
-            helper.Events.GameLoop.UpdateTicked += CheckHoldingScarecrow;
             helper.Events.Input.ButtonPressed += CheckButtonPressed;
         }
         
         private void DisplayOnRenderedWorld(object sender, RenderedWorldEventArgs e)
         {
+            drawer.Clear();
+            
+            var holding = CheckHoldingHighlight();
             if (!hovering && !holding && !pressed)
                 return;
-
-            drawer.DrawHighlightedObjects(sender, e);
             
-            if(holding)
-                drawer.Remove(Game1.currentCursorTile);
+            foreach (var pair in itemsToHighlight)
+            {
+                drawer.AddHighlight(pair.Key.TileLocation, pair.Value);
+            }
+            
+            drawer.DrawHighlightedObjects(sender, e);
         }
 
         private void CheckButtonPressed(object sender, ButtonPressedEventArgs e)
@@ -56,27 +60,28 @@ namespace ScarecrowHighlighter
                 pressed = !pressed;
         }
 
-        private void CheckHoldingScarecrow(object sender, UpdateTickedEventArgs e)
+        private bool CheckHoldingHighlight()
         {
             if (!Context.IsWorldReady)
-                return;
-            holding = false;
+                return false;
             if (Game1.player.CurrentItem == null || !config.HighlightOnHold)
-                return;
+                return false;
             
-            holding = Game1.player.CurrentItem.Name.Contains(config.SearchString);
+            var holding = MatchesSearchPattern(Game1.player.CurrentItem.Name, out int radius);
             if (holding)
-                drawer.AddHighlight(Game1.currentCursorTile, config.Radius);
+            {
+                drawer.AddHighlight(Game1.currentCursorTile, radius);
+            }
+            return holding;
         }
 
         private void PlayerOnWarped(object sender, WarpedEventArgs e)
         {
-            drawer.Clear();
             foreach (var obj in e.NewLocation.Objects.Values)
             {
-                if (obj.Name.Contains(config.SearchString))
+                if (MatchesSearchPattern(obj.Name, out int radius))
                 {
-                    drawer.AddHighlight(obj.TileLocation, config.Radius);
+                    itemsToHighlight.Add(obj, radius);
                 }
             }
         }
@@ -87,17 +92,17 @@ namespace ScarecrowHighlighter
                 return;
             foreach (var added in e.Added)
             {
-                if (added.Value.Name.Contains(config.SearchString))
+                if (MatchesSearchPattern(added.Value.Name, out int radius))
                 {
-                    drawer.AddHighlight(added.Value.TileLocation, config.Radius);
+                    itemsToHighlight.Add(added.Value, radius);
                 }
             }
 
             foreach (var removed in e.Removed)
             {
-                if (removed.Value.Name.Contains(config.SearchString))
+                if (MatchesSearchPattern(removed.Value.Name, out int radius))
                 {
-                    drawer.Remove(removed.Key);
+                    itemsToHighlight.Remove(removed.Value);
                 }
             }
         }
@@ -110,10 +115,26 @@ namespace ScarecrowHighlighter
             Object hovered = Game1.currentLocation.getObjectAtTile((int) tile.X, (int) tile.Y);
             if (hovered == null)
                 return;
-            if (!hovered.Name.Contains(config.SearchString) || !config.HighlightOnHovered)
+            if (!MatchesSearchPattern(hovered.Name, out int radius) || !config.HighlightOnHovered)
                 return;
 
             hovering = true;
+        }
+
+        private bool MatchesSearchPattern(string name, out int radius)
+        {
+            var searchItems = config.SearchItems.OrderByDescending(s => s.SearchString.Length);
+            foreach (ModConfig.SearchItem searchItem in searchItems)
+            {
+                if (name.Contains(searchItem.SearchString))
+                {
+                    radius = searchItem.Radius;
+                    return true;
+                }
+            }
+
+            radius = -1;
+            return false;
         }
     }
 }

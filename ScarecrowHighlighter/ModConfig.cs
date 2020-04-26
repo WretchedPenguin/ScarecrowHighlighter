@@ -11,8 +11,17 @@ namespace ScarecrowHighlighter
 {
     public class ModConfig
     {
-        public string SearchString { get; set; } = "crow";
-        public int Radius { get; set; } = 8;
+        public class SearchItem
+        {
+            public string SearchString { get; set; }
+            public int Radius { get; set; }
+        }
+        
+        public List<SearchItem> SearchItems = new List<SearchItem>
+        {
+            new SearchItem{SearchString = "crow",Radius = 8},
+            new SearchItem{SearchString = "Deluxe Scarecrow",Radius = 16},
+        };
         public string TexturePath { get; set; } = "LooseSprites/buildingPlacementTiles.xnb";
         public Rectangle TextureSourceRectangle { get; set; } = new Rectangle(0, 0, Game1.tileSize, Game1.tileSize);
         public SButton ToggleHighlightButton { get; set; } = SButton.L;

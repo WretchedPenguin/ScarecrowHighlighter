@@ -12,7 +12,7 @@ namespace ScarecrowHighlighter
 {
     public class HighlightedDrawer
     {
-        private readonly Dictionary<Vector2, int> highlights = new Dictionary<Vector2, int>();
+        public readonly Dictionary<Vector2, int> highlights = new Dictionary<Vector2, int>();
         private readonly Texture2D tileTexture;
         private readonly Rectangle textureSourceRectangle;
 
@@ -24,7 +24,7 @@ namespace ScarecrowHighlighter
 
         public void AddHighlight(Vector2 location, int radius)
         {
-            highlights.Add(location, radius);
+            highlights[location] = radius;
         }
         public void Remove(Vector2 location)
         {
