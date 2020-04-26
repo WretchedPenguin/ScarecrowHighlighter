@@ -20,13 +20,16 @@ namespace ScarecrowHighlighter
 
         private Texture2D tileTexture;
 
-        private readonly List<Object> scarecrows = new List<Object>();
-
         private ModConfig config;
+
+        private HighlightedDrawer drawer;
 
         public override void Entry(IModHelper helper)
         {
             config = Helper.ReadConfig<ModConfig>();
+            tileTexture =
+                Helper.Content.Load<Texture2D>(config.TexturePath, ContentSource.GameContent);
+            drawer = new HighlightedDrawer(tileTexture, config.TextureSourceRectangle);
 
             helper.Events.Input.CursorMoved += InputOnCursorMoved;
             helper.Events.Display.RenderedWorld += DisplayOnRenderedWorld;
@@ -34,9 +37,17 @@ namespace ScarecrowHighlighter
             helper.Events.Player.Warped += PlayerOnWarped;
             helper.Events.GameLoop.UpdateTicked += CheckHoldingScarecrow;
             helper.Events.Input.ButtonPressed += CheckButtonPressed;
+        }
+        
+        private void DisplayOnRenderedWorld(object sender, RenderedWorldEventArgs e)
+        {
+            if (!hovering && !holding && !pressed)
+                return;
 
-            tileTexture =
-                Helper.Content.Load<Texture2D>(config.TexturePath, ContentSource.GameContent);
+            drawer.DrawHighlightedObjects(sender, e);
+            
+            if(holding)
+                drawer.Remove(Game1.currentCursorTile);
         }
 
         private void CheckButtonPressed(object sender, ButtonPressedEventArgs e)
@@ -52,17 +63,20 @@ namespace ScarecrowHighlighter
             holding = false;
             if (Game1.player.CurrentItem == null || !config.HighlightOnHold)
                 return;
+            
             holding = Game1.player.CurrentItem.Name.Contains(config.SearchString);
+            if (holding)
+                drawer.AddHighlight(Game1.currentCursorTile, config.Radius);
         }
 
         private void PlayerOnWarped(object sender, WarpedEventArgs e)
         {
-            scarecrows.Clear();
+            drawer.Clear();
             foreach (var obj in e.NewLocation.Objects.Values)
             {
                 if (obj.Name.Contains(config.SearchString))
                 {
-                    scarecrows.Add(obj);
+                    drawer.AddHighlight(obj.TileLocation, config.Radius);
                 }
             }
         }
@@ -74,39 +88,19 @@ namespace ScarecrowHighlighter
             foreach (var added in e.Added)
             {
                 if (added.Value.Name.Contains(config.SearchString))
-                    scarecrows.Add(added.Value);
+                {
+                    drawer.AddHighlight(added.Value.TileLocation, config.Radius);
+                }
             }
 
             foreach (var removed in e.Removed)
             {
                 if (removed.Value.Name.Contains(config.SearchString))
-                    scarecrows.Remove(removed.Value);
+                {
+                    drawer.Remove(removed.Key);
+                }
             }
         }
-
-        private void DisplayOnRenderedWorld(object sender, RenderedWorldEventArgs e)
-        {
-            if (!hovering && !holding && !pressed)
-                return;
-
-            if (holding)
-                DrawScarecrow(e.SpriteBatch, Game1.currentCursorTile);
-
-            foreach (Object scarecrow in scarecrows)
-            {
-                DrawScarecrow(e.SpriteBatch, scarecrow.TileLocation);
-            }
-        }
-
-        private void DrawScarecrow(SpriteBatch spriteBatch, Vector2 tileLocation)
-        {
-            var locations = GetLocationsInRadius(tileLocation);
-            foreach (Vector2 location in locations)
-            {
-                spriteBatch.Draw(tileTexture, TileToScreen(location), config.TextureSourceRectangle, Color.White);
-            }
-        }
-
         private void InputOnCursorMoved(object sender, CursorMovedEventArgs e)
         {
             hovering = false;
@@ -120,30 +114,6 @@ namespace ScarecrowHighlighter
                 return;
 
             hovering = true;
-        }
-
-        private Vector2 TileToScreen(Vector2 location)
-        {
-            return new Vector2(location.X * Game1.tileSize - Game1.viewport.X,
-                (location.Y * Game1.tileSize) - Game1.viewport.Y);
-        }
-
-        private List<Vector2> GetLocationsInRadius(Vector2 location)
-        {
-            List<Vector2> locations = new List<Vector2>();
-            int radius = config.Radius;
-            for (float x = -radius; x <= radius; x++)
-            {
-                float tilesRemoved = Math.Abs(x) - radius / 2f;
-                for (float y = Math.Max(-radius, -radius + tilesRemoved);
-                    y <= Math.Min(radius, radius - tilesRemoved);
-                    y++)
-                {
-                    locations.Add(new Vector2(location.X + x, location.Y + y));
-                }
-            }
-
-            return locations;
         }
     }
 }
