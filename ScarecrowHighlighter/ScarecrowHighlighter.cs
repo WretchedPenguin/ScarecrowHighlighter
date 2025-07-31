@@ -123,11 +123,11 @@ public class ScarecrowHighlighterMod : Mod
 
         // Check if the object the cursor is above is a highlighted object
         var hoveredObject = Game1.currentLocation.getObjectAtTile((int) Game1.currentCursorTile.X, (int) Game1.currentCursorTile.Y);
-        var hovered = hoveredObject is not null && _configByQualifiedItemId.ContainsKey(hoveredObject.QualifiedItemId);
+        var hovered = _config.HighlightOnHovered && hoveredObject is not null && _configByQualifiedItemId.ContainsKey(hoveredObject.QualifiedItemId);
 
         // Check if the player is holding a highlighted item
         var holding = false;
-        if (Game1.player.CurrentItem != null)
+        if (Game1.player.CurrentItem != null && _config.HighlightOnHold)
         {
             holding = _configByQualifiedItemId.ContainsKey(Game1.player.CurrentItem.QualifiedItemId);
             if (holding)
