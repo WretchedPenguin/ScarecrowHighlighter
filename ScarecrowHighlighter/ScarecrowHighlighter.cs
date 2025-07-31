@@ -119,6 +119,8 @@ public class ScarecrowHighlighterMod : Mod
 
     private void DisplayHighlighting(object? sender, RenderedWorldEventArgs e)
     {
+        if (!Context.IsPlayerFree) return;
+
         List<(Vector2 location, string qualifiedItemId)> highlightedLocations = new();
 
         // Check if the object the cursor is above is a highlighted object
