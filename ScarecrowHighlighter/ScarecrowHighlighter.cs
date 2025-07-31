@@ -7,14 +7,11 @@ namespace ScarecrowHighlighter;
 
 public class ScarecrowHighlighterMod : Mod
 {
-    private bool _hovering;
-    private bool _pressed;
+    private bool _alwaysDisplayHighlighting;
 
     private ModConfig _config = null!;
 
     private readonly HighlightedDrawer _drawer = new();
-    private readonly Dictionary<Object, int> _itemsToHighlight = new();
-
     private readonly Dictionary<string, int> _radiusByQualifiedId = new();
 
     public override void Entry(IModHelper helper)
@@ -26,11 +23,8 @@ public class ScarecrowHighlighterMod : Mod
         helper.Events.GameLoop.GameLaunched += BuildHighlightingList;
         helper.Events.GameLoop.GameLaunched += RegisterModConfigMenu;
 
-        helper.Events.Input.CursorMoved += InputOnCursorMoved;
-        helper.Events.Display.RenderedWorld += DisplayOnRenderedWorld;
-        helper.Events.World.ObjectListChanged += WorldOnObjectListChanged;
-        helper.Events.Player.Warped += PlayerOnWarped;
-        helper.Events.Input.ButtonPressed += CheckButtonPressed;
+        helper.Events.Display.RenderedWorld += DisplayHighlighting;
+        helper.Events.Input.ButtonPressed += CheckToggleHighlightButton;
     }
 
 
@@ -91,88 +85,42 @@ public class ScarecrowHighlighterMod : Mod
         );
     }
 
-    private void DisplayOnRenderedWorld(object? sender, RenderedWorldEventArgs e)
+    private void DisplayHighlighting(object? sender, RenderedWorldEventArgs e)
     {
         _drawer.Clear();
 
-        var holding = CheckHoldingHighlight();
-        if (!_hovering && !holding && !_pressed)
-            return;
-
-        foreach (var pair in _itemsToHighlight)
+        // Check if the object the cursor is above is a highlighted object
+        var hovered = Game1.currentLocation.getObjectAtTile((int) Game1.currentCursorTile.X, (int) Game1.currentCursorTile.Y);
+        if (hovered != null && _radiusByQualifiedId.TryGetValue(hovered.QualifiedItemId, out var hoveredRadius))
         {
-            _drawer.Add(pair.Key.TileLocation, pair.Value);
+            _drawer.Add(hovered.TileLocation, hoveredRadius);
+        }
+        
+        // Check if the player is holding a highlighted item
+        var holding = _radiusByQualifiedId.TryGetValue(Game1.player.CurrentItem.QualifiedItemId, out var holdingRadius);
+        if (holding)
+        {
+            _drawer.Add(Game1.currentCursorTile, holdingRadius);
+        }
+
+        // If the highlighting shouldn't be displayed, don't render it
+        if (!(hovered is not null || holding || _alwaysDisplayHighlighting)) return;
+
+        foreach (var worldObject in Game1.currentLocation.Objects.Values)
+        {
+            if (_radiusByQualifiedId.TryGetValue(worldObject.QualifiedItemId, out var radius))
+            {
+                _drawer.Add(worldObject.TileLocation, radius);
+            }
         }
 
         _drawer.DrawHighlightedObjects(e);
     }
 
-    private void CheckButtonPressed(object? sender, ButtonPressedEventArgs e)
+    private void CheckToggleHighlightButton(object? sender, ButtonPressedEventArgs e)
     {
         if (e.Button != _config.ToggleHighlightButton) return;
 
-        _pressed = !_pressed;
-    }
-
-    private bool CheckHoldingHighlight()
-    {
-        if (!Context.IsWorldReady) return false;
-        if (Game1.player.CurrentItem == null) return false;
-        if (!_config.HighlightOnHold) return false;
-
-        var holding = _radiusByQualifiedId.TryGetValue(Game1.player.CurrentItem.QualifiedItemId, out var radius);
-
-        if (holding)
-        {
-            _drawer.Add(Game1.currentCursorTile, radius);
-        }
-
-        return holding;
-    }
-
-    private void PlayerOnWarped(object? sender, WarpedEventArgs e)
-    {
-        foreach (var obj in e.NewLocation.Objects.Values)
-        {
-            if (_radiusByQualifiedId.TryGetValue(obj.QualifiedItemId, out var radius))
-            {
-                _itemsToHighlight.Add(obj, radius);
-            }
-        }
-    }
-
-    private void WorldOnObjectListChanged(object? sender, ObjectListChangedEventArgs e)
-    {
-        if (!e.IsCurrentLocation) return;
-
-        foreach (var added in e.Added)
-        {
-            if (_radiusByQualifiedId.TryGetValue(added.Value.QualifiedItemId, out var radius))
-            {
-                _itemsToHighlight.Add(added.Value, radius);
-            }
-        }
-
-        foreach (var removed in e.Removed)
-        {
-            if (_radiusByQualifiedId.ContainsKey(removed.Value.QualifiedItemId))
-            {
-                _itemsToHighlight.Remove(removed.Value);
-            }
-        }
-    }
-
-    private void InputOnCursorMoved(object? sender, CursorMovedEventArgs e)
-    {
-        _hovering = false;
-        if (!Context.IsWorldReady) return;
-        if (!_config.HighlightOnHovered) return;
-
-        var tile = e.NewPosition.Tile;
-        var hovered = Game1.currentLocation.getObjectAtTile((int) tile.X, (int) tile.Y);
-        if (hovered == null) return;
-        if (!_radiusByQualifiedId.ContainsKey(hovered.QualifiedItemId)) return;
-
-        _hovering = true;
+        _alwaysDisplayHighlighting = !_alwaysDisplayHighlighting;
     }
 }
