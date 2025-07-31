@@ -13,18 +13,10 @@ public class HighlightedDrawer
         _config = config;
     }
 
-    public void DrawHighlightedItems(SpriteBatch batch, Dictionary<string, int> radiusByQualifiedItemId, List<(Vector2 location, string qualifiedItemId)> items)
+    public void DrawHighlightedItems(SpriteBatch batch, List<(Vector2 location, string qualifiedItemId)> items)
     {
-        var tiles = items
-            // Turn the list of objects' locations to a list of tiles to highlight
-            .SelectMany(item =>
-            {
-                var radius = radiusByQualifiedItemId[item.qualifiedItemId];
-                return GetLocationsInRadius(item.location, radius)
-                    .Select(location => item with { location = location });
-            })
-            // Do a lookup to collect all the items that affect this location
-            .ToLookup(x => x.location, x => x.qualifiedItemId);
+        // Do a lookup to collect all the items that affect a location
+        var tiles = items.ToLookup(x => x.location, x => x.qualifiedItemId);
 
         foreach (var toDraw in tiles)
         {
@@ -52,7 +44,7 @@ public class HighlightedDrawer
 
         // Adds icons for the sources of the highlighting
         if (!_config.HighlightSource) return;
-        
+
         // Make sure the icons are always displayed in the same order
         var orderedItemIds = qualifiedItemIds.Distinct().OrderBy(x => x).ToList();
         var columnAmount = (float) Math.Ceiling(Math.Sqrt(orderedItemIds.Count));
@@ -91,20 +83,5 @@ public class HighlightedDrawer
             location.X * Game1.tileSize - Game1.viewport.X,
             location.Y * Game1.tileSize - Game1.viewport.Y
         );
-    }
-
-    private static IEnumerable<Vector2> GetLocationsInRadius(Vector2 location, int radius)
-    {
-        for (float x = -radius; x < radius; x++)
-        {
-            for (var y = -radius; y < radius; y++)
-            {
-                var tileLocation = new Vector2(location.X + x, location.Y + y);
-                if (Vector2.Distance(location, tileLocation) < radius)
-                {
-                    yield return tileLocation;
-                }
-            }
-        }
     }
 }

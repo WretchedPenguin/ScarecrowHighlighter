@@ -13,7 +13,7 @@ public class ScarecrowHighlighterMod : Mod
     private ModConfig _config = null!;
     private HighlightedDrawer _drawer = null!;
 
-    private readonly Dictionary<string, int> _radiusByQualifiedItemId = new();
+    private readonly Dictionary<string, HighlightingConfig> _configByQualifiedItemId = new();
 
     public override void Entry(IModHelper helper)
     {
@@ -22,7 +22,7 @@ public class ScarecrowHighlighterMod : Mod
         _config = Helper.ReadConfig<ModConfig>();
         _drawer = new HighlightedDrawer(_config);
 
-        helper.Events.GameLoop.GameLaunched += BuildHighlightingList;
+        helper.Events.GameLoop.GameLaunched += (_, _) => BuildHighlightingList();
         helper.Events.GameLoop.GameLaunched += RegisterModConfigMenu;
 
         helper.Events.Display.RenderedWorld += DisplayHighlighting;
@@ -33,8 +33,11 @@ public class ScarecrowHighlighterMod : Mod
     /// Builds a list of objects to highlight based on the name of registered items.
     /// The radius from the scarecrow is taken from the official method <see cref="Object.GetRadiusForScarecrow"/>
     /// </summary>
-    private void BuildHighlightingList(object? sender, GameLaunchedEventArgs e)
+    private void BuildHighlightingList()
     {
+        // Clear for when the config changes
+        _configByQualifiedItemId.Clear();
+
         foreach (var itemType in ItemRegistry.ItemTypes.Where(x => x.Identifier == "(BC)"))
         {
             foreach (var id in itemType.GetAllIds())
@@ -44,8 +47,16 @@ public class ScarecrowHighlighterMod : Mod
                 if (!data.InternalName.Contains("arecrow", StringComparison.OrdinalIgnoreCase)) continue;
 
                 var radius = data.InternalName.Contains("deluxe", StringComparison.OrdinalIgnoreCase) ? 17 : 9;
-                _radiusByQualifiedItemId.Add(data.QualifiedItemId, radius);
+                _configByQualifiedItemId.Add(data.QualifiedItemId, new HighlightingConfig(radius, HighlightingType.Circle));
             }
+        }
+
+        if (_config.HighlightSprinklers)
+        {
+            // Radius can be overriden when placed with an upgrade, this is handled using the GetSprinklerTiles method later
+            _configByQualifiedItemId["(O)599"] = new HighlightingConfig(0, HighlightingType.Square);
+            _configByQualifiedItemId["(O)621"] = new HighlightingConfig(1, HighlightingType.Square);
+            _configByQualifiedItemId["(O)645"] = new HighlightingConfig(2, HighlightingType.Square);
         }
     }
 
@@ -86,6 +97,18 @@ public class ScarecrowHighlighterMod : Mod
             setValue: value => _config.HighlightSource = value
         );
 
+        configMenu.AddBoolOption(
+            mod: ModManifest,
+            name: I18n.Config_HighlightSprinklers_Name,
+            tooltip: I18n.Config_HighlightSprinklers_Tooltip,
+            getValue: () => _config.HighlightSprinklers,
+            setValue: value =>
+            {
+                _config.HighlightSprinklers = value;
+                // Rebuild the list of highlighting objects
+                BuildHighlightingList();
+            });
+
         configMenu.AddKeybind(
             mod: ModManifest,
             name: I18n.Config_ToggleHighlight_Name,
@@ -99,31 +122,83 @@ public class ScarecrowHighlighterMod : Mod
         List<(Vector2 location, string qualifiedItemId)> highlightedLocations = new();
 
         // Check if the object the cursor is above is a highlighted object
-        var hovered = Game1.currentLocation.getObjectAtTile((int) Game1.currentCursorTile.X, (int) Game1.currentCursorTile.Y);
-        if (hovered != null && _radiusByQualifiedItemId.ContainsKey(hovered.QualifiedItemId))
-        {
-            highlightedLocations.Add((hovered.TileLocation, hovered.QualifiedItemId));
-        }
+        var hoveredObject = Game1.currentLocation.getObjectAtTile((int) Game1.currentCursorTile.X, (int) Game1.currentCursorTile.Y);
+        var hovered = hoveredObject is not null && _configByQualifiedItemId.ContainsKey(hoveredObject.QualifiedItemId);
 
         // Check if the player is holding a highlighted item
-        var holding = _radiusByQualifiedItemId.ContainsKey(Game1.player.CurrentItem.QualifiedItemId);
-        if (holding)
+        var holding = false;
+        if (Game1.player.CurrentItem != null)
         {
-            highlightedLocations.Add((Game1.currentCursorTile, Game1.player.CurrentItem.QualifiedItemId));
-        }
-
-        // If the highlighting shouldn't be displayed, don't render it
-        if (!(hovered is not null || holding || _alwaysDisplayHighlighting)) return;
-
-        foreach (var worldObject in Game1.currentLocation.Objects.Values)
-        {
-            if (_radiusByQualifiedItemId.ContainsKey(worldObject.QualifiedItemId))
+            holding = _configByQualifiedItemId.ContainsKey(Game1.player.CurrentItem.QualifiedItemId);
+            if (holding)
             {
-                highlightedLocations.Add((worldObject.TileLocation, worldObject.QualifiedItemId));
+                AddTilesInRange(ref highlightedLocations, Game1.currentCursorTile, Game1.player.CurrentItem.QualifiedItemId);
             }
         }
 
-        _drawer.DrawHighlightedItems(e.SpriteBatch, _radiusByQualifiedItemId, highlightedLocations);
+        // If the highlighting shouldn't be displayed, don't render it
+        if (!(hovered || holding || _alwaysDisplayHighlighting)) return;
+
+        foreach (var worldObject in Game1.currentLocation.Objects.Values)
+        {
+            if (_config.HighlightSprinklers && worldObject.GetSprinklerTiles().Any())
+            {
+                highlightedLocations.AddRange(worldObject.GetSprinklerTiles().Select(tile => (tile, worldObject.QualifiedItemId)));
+            }
+
+            AddTilesInRange(ref highlightedLocations, worldObject.TileLocation, worldObject.QualifiedItemId);
+        }
+
+        _drawer.DrawHighlightedItems(e.SpriteBatch, highlightedLocations);
+    }
+
+    private void AddTilesInRange(ref List<(Vector2 location, string qualifiedItemId)> highlightedLocations, Vector2 location, string qualifiedItemId)
+    {
+        IEnumerable<Vector2> tiles = new List<Vector2>();
+        if (_configByQualifiedItemId.TryGetValue(qualifiedItemId, out var config))
+        {
+            tiles = config.Type is HighlightingType.Circle
+                ? GetLocationsInCircleRadius(location, config.Radius)
+                : GetLocationsInSquareRadius(location, config.Radius);
+        }
+
+        var tilesWithItemId = tiles.Select(tile => (tile, qualifiedItemId));
+        highlightedLocations.AddRange(tilesWithItemId);
+    }
+
+    private static IEnumerable<Vector2> GetLocationsInCircleRadius(Vector2 location, int radius)
+    {
+        for (float x = -radius; x < radius; x++)
+        {
+            for (var y = -radius; y < radius; y++)
+            {
+                var tileLocation = new Vector2(location.X + x, location.Y + y);
+                if (Vector2.Distance(location, tileLocation) < radius)
+                {
+                    yield return tileLocation;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Code ported from <see cref="Object.GetSprinklerTiles"/> to be supported outside of Object
+    /// </summary>
+    private static IEnumerable<Vector2> GetLocationsInSquareRadius(Vector2 location, int radius)
+    {
+        if (radius == 0)
+            return Utility.getAdjacentTileLocations(location);
+        if (radius <= 0)
+            return new List<Vector2>();
+
+        var tiles = new List<Vector2>();
+        for (var x = (int) location.X - radius; x <= location.X + (double) radius; ++x)
+        {
+            for (var y = (int) location.Y - radius; y <= location.Y + (double) radius; ++y)
+                tiles.Add(new Vector2(x, y));
+        }
+
+        return tiles;
     }
 
     private void CheckToggleHighlightButton(object? sender, ButtonPressedEventArgs e)
@@ -132,4 +207,12 @@ public class ScarecrowHighlighterMod : Mod
 
         _alwaysDisplayHighlighting = !_alwaysDisplayHighlighting;
     }
+}
+
+public record HighlightingConfig(int Radius, HighlightingType Type);
+
+public enum HighlightingType
+{
+    Circle,
+    Square,
 }

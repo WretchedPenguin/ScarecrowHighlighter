@@ -8,4 +8,5 @@ public class ModConfig
     public bool HighlightOnHold { get; set; } = true;
     public bool HighlightOnHovered { get; set; } = true;
     public bool HighlightSource { get; set; } = true;
+    public bool HighlightSprinklers { get; set; } = true;
 }
