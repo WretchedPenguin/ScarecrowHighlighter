@@ -121,7 +121,7 @@ public class ScarecrowHighlighterMod : Mod
     {
         if (!Context.IsPlayerFree) return;
 
-        List<(Vector2 location, string qualifiedItemId)> highlightedLocations = new();
+        var qualifiedItemIdsPerLocation = new Dictionary<Vector2, HashSet<string>>();
 
         // Check if the object the cursor is above is a highlighted object
         var hoveredObject = Game1.currentLocation.getObjectAtTile((int) Game1.currentCursorTile.X, (int) Game1.currentCursorTile.Y);
@@ -134,7 +134,7 @@ public class ScarecrowHighlighterMod : Mod
             holding = _configByQualifiedItemId.ContainsKey(Game1.player.CurrentItem.QualifiedItemId);
             if (holding)
             {
-                AddTilesInRange(ref highlightedLocations, Game1.currentCursorTile, Game1.player.CurrentItem.QualifiedItemId);
+                AddTilesInRange(ref qualifiedItemIdsPerLocation, Game1.currentCursorTile, Game1.player.CurrentItem.QualifiedItemId);
             }
         }
 
@@ -143,20 +143,24 @@ public class ScarecrowHighlighterMod : Mod
 
         foreach (var worldObject in Game1.currentLocation.Objects.Values)
         {
-            if (_config.HighlightSprinklers && worldObject.GetSprinklerTiles().Any())
+            var sprinklerTiles = worldObject.GetSprinklerTiles();
+            if (_config.HighlightSprinklers && sprinklerTiles.Any())
             {
-                highlightedLocations.AddRange(worldObject.GetSprinklerTiles().Select(tile => (tile, worldObject.QualifiedItemId)));
+                foreach (var sprinklerTile in sprinklerTiles)
+                {
+                    qualifiedItemIdsPerLocation.AddOrAppend(sprinklerTile, worldObject.QualifiedItemId);
+                }
             }
 
-            AddTilesInRange(ref highlightedLocations, worldObject.TileLocation, worldObject.QualifiedItemId);
+            AddTilesInRange(ref qualifiedItemIdsPerLocation, worldObject.TileLocation, worldObject.QualifiedItemId);
         }
 
-        _drawer.DrawHighlightedItems(e.SpriteBatch, highlightedLocations);
+        _drawer.DrawHighlightedItems(e.SpriteBatch, qualifiedItemIdsPerLocation);
     }
 
-    private void AddTilesInRange(ref List<(Vector2 location, string qualifiedItemId)> highlightedLocations, Vector2 location, string qualifiedItemId)
+    private void AddTilesInRange(ref Dictionary<Vector2, HashSet<string>> qualifiedItemIdsPerLocation, Vector2 location, string qualifiedItemId)
     {
-        IEnumerable<Vector2> tiles = new List<Vector2>();
+        var tiles = Enumerable.Empty<Vector2>();
         if (_configByQualifiedItemId.TryGetValue(qualifiedItemId, out var config))
         {
             tiles = config.Type is HighlightingType.Circle
@@ -164,8 +168,10 @@ public class ScarecrowHighlighterMod : Mod
                 : GetLocationsInSquareRadius(location, config.Radius);
         }
 
-        var tilesWithItemId = tiles.Select(tile => (tile, qualifiedItemId));
-        highlightedLocations.AddRange(tilesWithItemId);
+        foreach (var tile in tiles)
+        {
+            qualifiedItemIdsPerLocation.AddOrAppend(tile, qualifiedItemId);
+        }
     }
 
     private static IEnumerable<Vector2> GetLocationsInCircleRadius(Vector2 location, int radius)
@@ -189,18 +195,20 @@ public class ScarecrowHighlighterMod : Mod
     private static IEnumerable<Vector2> GetLocationsInSquareRadius(Vector2 location, int radius)
     {
         if (radius == 0)
-            return Utility.getAdjacentTileLocations(location);
-        if (radius <= 0)
-            return new List<Vector2>();
+        {
+            foreach (var adjacentTileLocation in Utility.getAdjacentTileLocations(location))
+            {
+                yield return adjacentTileLocation;
+            }
+        }
 
-        var tiles = new List<Vector2>();
+        if (radius <= 0) yield break;
+
         for (var x = (int) location.X - radius; x <= location.X + (double) radius; ++x)
         {
             for (var y = (int) location.Y - radius; y <= location.Y + (double) radius; ++y)
-                tiles.Add(new Vector2(x, y));
+                yield return new Vector2(x, y);
         }
-
-        return tiles;
     }
 
     private void CheckToggleHighlightButton(object? sender, ButtonPressedEventArgs e)

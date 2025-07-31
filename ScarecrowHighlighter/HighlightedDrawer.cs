@@ -13,18 +13,15 @@ public class HighlightedDrawer
         _config = config;
     }
 
-    public void DrawHighlightedItems(SpriteBatch batch, List<(Vector2 location, string qualifiedItemId)> items)
+    public void DrawHighlightedItems(SpriteBatch batch, Dictionary<Vector2, HashSet<string>> tiles)
     {
-        // Do a lookup to collect all the items that affect a location
-        var tiles = items.ToLookup(x => x.location, x => x.qualifiedItemId);
-
         foreach (var toDraw in tiles)
         {
-            DrawTile(batch, toDraw.Key, toDraw.ToList());
+            DrawTile(batch, toDraw.Key, toDraw.Value);
         }
     }
 
-    private void DrawTile(SpriteBatch spriteBatch, Vector2 tileLocation, List<string> qualifiedItemIds)
+    private void DrawTile(SpriteBatch spriteBatch, Vector2 tileLocation, HashSet<string> qualifiedItemIds)
     {
         const int cursorSize = 16;
 
