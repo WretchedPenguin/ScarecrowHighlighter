@@ -1,0 +1,7 @@
+{
+  "config.highlight_on_hold.name": "Highlight on hold",
+  "config.highlight_on_hold.tooltip": "Range of scarecrows is highlighted when holding a scarecrow",
+  "config.highlight_on_hover.name": "Highlight on hover",
+  "config.highlight_on_hover.tooltip": "Range of scarecrows is highlighted when hovering over any scarecrow with the cursor",
+  "config.toggle_highlight.name": "Toggle highlighting"
+}
