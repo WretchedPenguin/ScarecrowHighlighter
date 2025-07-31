@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -27,9 +22,7 @@ namespace ScarecrowHighlighter
         public override void Entry(IModHelper helper)
         {
             config = Helper.ReadConfig<ModConfig>();
-            tileTexture =
-                Helper.Content.Load<Texture2D>(config.TexturePath, ContentSource.GameContent);
-            drawer = new HighlightedDrawer(tileTexture, config.TextureSourceRectangle);
+            drawer = new HighlightedDrawer();
 
             helper.Events.Input.CursorMoved += InputOnCursorMoved;
             helper.Events.Display.RenderedWorld += DisplayOnRenderedWorld;
