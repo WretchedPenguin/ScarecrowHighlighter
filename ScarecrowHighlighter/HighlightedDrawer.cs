@@ -48,29 +48,35 @@ public class HighlightedDrawer
         // Make sure the icons are always displayed in the same order
         var orderedItemIds = qualifiedItemIds.Distinct().OrderBy(x => x).ToList();
         var columnAmount = (float) Math.Ceiling(Math.Sqrt(orderedItemIds.Count));
-        var iconSize = Game1.tileSize / columnAmount;
-        const int padding = 4;
+        const int padding = 8;
+        var iconSize = (Game1.tileSize - padding * 2) / columnAmount;
 
         // For each unique source, add an icon
         for (var i = 0; i < orderedItemIds.Count; i++)
         {
-            var x = i % columnAmount;
-            var y = (float) Math.Floor(i / columnAmount);
-            var iconPosition = position + new Vector2(x * iconSize + padding, y * iconSize + padding);
-
-            var qualifiedItemId = qualifiedItemIds[i];
+            var qualifiedItemId = orderedItemIds[i];
             var data = ItemRegistry.GetData(qualifiedItemId);
             var texture = data.GetTexture();
             var sourceRectangle = data.GetSourceRect();
 
+            // Scale the icon to fix the size it's supposed to be, to fix exactly in the grid, but a little smaller
+            var scale = new Vector2(iconSize / sourceRectangle.Height * 0.75f);
+            var actualWidth = scale.X * sourceRectangle.Width;
+            var actualHeight = scale.Y * sourceRectangle.Height;
+            
+            var x = i % columnAmount;
+            var y = (float) Math.Floor(i / columnAmount);
+            var iconPositionTopLeft = position + new Vector2(x * iconSize + padding, y * iconSize + padding);
+            var centered = new Vector2(iconPositionTopLeft.X + (iconSize - actualWidth) / 2, iconPositionTopLeft.Y + (iconSize - actualHeight) / 2);
+
             spriteBatch.Draw(
                 texture: texture,
-                position: iconPosition,
+                position: centered,
                 sourceRectangle: sourceRectangle,
-                color: Color.White * 0.3f,
+                color: Color.White * 0.5f,
                 rotation: 0,
                 origin: Vector2.Zero,
-                scale: Vector2.One,
+                scale: scale,
                 effects: SpriteEffects.None,
                 layerDepth: 1
             );
