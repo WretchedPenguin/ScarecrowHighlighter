@@ -7,4 +7,5 @@ public class ModConfig
     public SButton ToggleHighlightButton { get; set; } = SButton.L;
     public bool HighlightOnHold { get; set; } = true;
     public bool HighlightOnHovered { get; set; } = true;
+    public bool HighlightSource { get; set; } = true;
 }

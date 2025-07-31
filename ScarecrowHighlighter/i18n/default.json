@@ -3,5 +3,7 @@
   "config.highlight_on_hold.tooltip": "Range of scarecrows is highlighted when holding a scarecrow",
   "config.highlight_on_hover.name": "Highlight on hover",
   "config.highlight_on_hover.tooltip": "Range of scarecrows is highlighted when hovering over any scarecrow with the cursor",
-  "config.toggle_highlight.name": "Toggle highlighting"
+  "config.toggle_highlight.name": "Toggle highlighting",
+  "config.highlight_source.name": "Show highlight source",
+  "config.highlight_source.tooltip": "Shows which item caused the highlighting, useful for discovering overlapping regions"
 }

@@ -11,8 +11,8 @@ public class ScarecrowHighlighterMod : Mod
     private bool _alwaysDisplayHighlighting;
 
     private ModConfig _config = null!;
+    private HighlightedDrawer _drawer = null!;
 
-    private readonly HighlightedDrawer _drawer = new();
     private readonly Dictionary<string, int> _radiusByQualifiedItemId = new();
 
     public override void Entry(IModHelper helper)
@@ -20,6 +20,7 @@ public class ScarecrowHighlighterMod : Mod
         I18n.Init(helper.Translation);
 
         _config = Helper.ReadConfig<ModConfig>();
+        _drawer = new HighlightedDrawer(_config);
 
         helper.Events.GameLoop.GameLaunched += BuildHighlightingList;
         helper.Events.GameLoop.GameLaunched += RegisterModConfigMenu;
@@ -75,6 +76,14 @@ public class ScarecrowHighlighterMod : Mod
             tooltip: I18n.Config_HighlightOnHover_Tooltip,
             getValue: () => _config.HighlightOnHovered,
             setValue: value => _config.HighlightOnHovered = value
+        );
+
+        configMenu.AddBoolOption(
+            mod: ModManifest,
+            name: I18n.Config_HighlightSource_Name,
+            tooltip: I18n.Config_HighlightSource_Tooltip,
+            getValue: () => _config.HighlightSource,
+            setValue: value => _config.HighlightSource = value
         );
 
         configMenu.AddKeybind(
