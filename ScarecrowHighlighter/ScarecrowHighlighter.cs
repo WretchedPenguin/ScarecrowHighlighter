@@ -1,6 +1,4 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using StardewModdingAPI;
+﻿using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using Object = StardewValley.Object;
@@ -9,20 +7,19 @@ namespace ScarecrowHighlighter
 {
     public class ScarecrowHighlighterMod : Mod
     {
-        private bool hovering;
-        private bool pressed;
+        private bool _hovering;
+        private bool _pressed;
 
-        private ModConfig Config;
+        private ModConfig _config = null!;
 
-        private HighlightedDrawer drawer;
-        private readonly Dictionary<Object, int> itemsToHighlight = new Dictionary<Object, int>();
+        private readonly HighlightedDrawer _drawer = new();
+        private readonly Dictionary<Object, int> _itemsToHighlight = new();
 
         public override void Entry(IModHelper helper)
         {
             I18n.Init(helper.Translation);
 
-            Config = Helper.ReadConfig<ModConfig>();
-            drawer = new HighlightedDrawer();
+            _config = Helper.ReadConfig<ModConfig>();
 
             helper.Events.GameLoop.GameLaunched += RegisterModConfigMenu;
             helper.Events.Input.CursorMoved += InputOnCursorMoved;
@@ -41,131 +38,127 @@ namespace ScarecrowHighlighter
 
             configMenu.Register(
                 mod: ModManifest,
-                reset: () => Config = new ModConfig(),
-                save: () => Helper.WriteConfig(Config)
+                reset: () => _config = new ModConfig(),
+                save: () => Helper.WriteConfig(_config)
             );
 
             configMenu.AddBoolOption(
                 mod: ModManifest,
                 name: I18n.Config_HighlightOnHold_Name,
                 tooltip: I18n.Config_HighlightOnHold_Tooltip,
-                getValue: () => Config.HighlightOnHold,
-                setValue: value => Config.HighlightOnHold = value
+                getValue: () => _config.HighlightOnHold,
+                setValue: value => _config.HighlightOnHold = value
             );
 
             configMenu.AddBoolOption(
                 mod: ModManifest,
                 name: I18n.Config_HighlightOnHover_Name,
                 tooltip: I18n.Config_HighlightOnHover_Tooltip,
-                getValue: () => Config.HighlightOnHovered,
-                setValue: value => Config.HighlightOnHovered = value
+                getValue: () => _config.HighlightOnHovered,
+                setValue: value => _config.HighlightOnHovered = value
             );
 
             configMenu.AddKeybind(
                 mod: ModManifest,
                 name: I18n.Config_ToggleHighlight_Name,
-                getValue: () => Config.ToggleHighlightButton,
-                setValue: value => Config.ToggleHighlightButton = value
+                getValue: () => _config.ToggleHighlightButton,
+                setValue: value => _config.ToggleHighlightButton = value
             );
         }
 
-        private void DisplayOnRenderedWorld(object sender, RenderedWorldEventArgs e)
+        private void DisplayOnRenderedWorld(object? sender, RenderedWorldEventArgs e)
         {
-            drawer.Clear();
+            _drawer.Clear();
 
             var holding = CheckHoldingHighlight();
-            if (!hovering && !holding && !pressed)
+            if (!_hovering && !holding && !_pressed)
                 return;
 
-            foreach (var pair in itemsToHighlight)
+            foreach (var pair in _itemsToHighlight)
             {
-                drawer.AddHighlight(pair.Key.TileLocation, pair.Value);
+                _drawer.Add(pair.Key.TileLocation, pair.Value);
             }
 
-            drawer.DrawHighlightedObjects(sender, e);
+            _drawer.DrawHighlightedObjects(e);
         }
 
-        private void CheckButtonPressed(object sender, ButtonPressedEventArgs e)
+        private void CheckButtonPressed(object? sender, ButtonPressedEventArgs e)
         {
-            if (e.Button == Config.ToggleHighlightButton)
-                pressed = !pressed;
+            if (e.Button == _config.ToggleHighlightButton)
+                _pressed = !_pressed;
         }
 
         private bool CheckHoldingHighlight()
         {
             if (!Context.IsWorldReady)
                 return false;
-            if (Game1.player.CurrentItem == null || !Config.HighlightOnHold)
+            if (Game1.player.CurrentItem == null || !_config.HighlightOnHold)
                 return false;
 
-            var holding = MatchesSearchPattern(Game1.player.CurrentItem.Name, out int radius);
+            var holding = MatchesSearchPattern(Game1.player.CurrentItem.Name, out var radius);
             if (holding)
             {
-                drawer.AddHighlight(Game1.currentCursorTile, radius);
+                _drawer.Add(Game1.currentCursorTile, radius);
             }
 
             return holding;
         }
 
-        private void PlayerOnWarped(object sender, WarpedEventArgs e)
+        private void PlayerOnWarped(object? sender, WarpedEventArgs e)
         {
             foreach (var obj in e.NewLocation.Objects.Values)
             {
-                if (MatchesSearchPattern(obj.Name, out int radius))
+                if (MatchesSearchPattern(obj.Name, out var radius))
                 {
-                    itemsToHighlight.Add(obj, radius);
+                    _itemsToHighlight.Add(obj, radius);
                 }
             }
         }
 
-        private void WorldOnObjectListChanged(object sender, ObjectListChangedEventArgs e)
+        private void WorldOnObjectListChanged(object? sender, ObjectListChangedEventArgs e)
         {
             if (!e.IsCurrentLocation)
                 return;
             foreach (var added in e.Added)
             {
-                if (MatchesSearchPattern(added.Value.Name, out int radius))
+                if (MatchesSearchPattern(added.Value.Name, out var radius))
                 {
-                    itemsToHighlight.Add(added.Value, radius);
+                    _itemsToHighlight.Add(added.Value, radius);
                 }
             }
 
             foreach (var removed in e.Removed)
             {
-                if (MatchesSearchPattern(removed.Value.Name, out int radius))
+                if (MatchesSearchPattern(removed.Value.Name, out _))
                 {
-                    itemsToHighlight.Remove(removed.Value);
+                    _itemsToHighlight.Remove(removed.Value);
                 }
             }
         }
 
-        private void InputOnCursorMoved(object sender, CursorMovedEventArgs e)
+        private void InputOnCursorMoved(object? sender, CursorMovedEventArgs e)
         {
-            hovering = false;
-            if (e == null || !Context.IsWorldReady)
-                return;
-            if (!Config.HighlightOnHovered) return;
+            _hovering = false;
+            if (!Context.IsWorldReady) return;
+            if (!_config.HighlightOnHovered) return;
 
-            Vector2 tile = e.NewPosition.Tile;
-            Object hovered = Game1.currentLocation.getObjectAtTile((int)tile.X, (int)tile.Y);
-            if (hovered == null)
-                return;
-            if (!MatchesSearchPattern(hovered.Name, out int radius))
-                return;
+            var tile = e.NewPosition.Tile;
+            var hovered = Game1.currentLocation.getObjectAtTile((int) tile.X, (int) tile.Y);
+            if (hovered == null) return;
+            if (!MatchesSearchPattern(hovered.Name, out _)) return;
 
-            hovering = true;
+            _hovering = true;
         }
 
         private bool MatchesSearchPattern(string name, out int radius)
         {
-            var searchItems = Config.SearchItems.OrderByDescending(s => s.SearchString.Length);
-            foreach (ModConfig.SearchItem searchItem in searchItems)
+            var searchItems = _config.SearchItems.OrderByDescending(s => s.SearchString.Length);
+            foreach (var searchItem in searchItems)
             {
-                if (name.Contains(searchItem.SearchString))
-                {
-                    radius = searchItem.Radius;
-                    return true;
-                }
+                if (!name.Contains(searchItem.SearchString)) continue;
+
+                radius = searchItem.Radius;
+                return true;
             }
 
             radius = -1;

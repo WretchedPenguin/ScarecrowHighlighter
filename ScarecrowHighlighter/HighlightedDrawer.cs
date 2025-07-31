@@ -7,38 +7,33 @@ namespace ScarecrowHighlighter
 {
     public class HighlightedDrawer
     {
-        public readonly Dictionary<Vector2, int> highlights = new Dictionary<Vector2, int>();
+        private readonly Dictionary<Vector2, int> _highlights = new();
 
-        public void AddHighlight(Vector2 location, int radius)
+        public void Add(Vector2 location, int radius)
         {
-            highlights[location] = radius;
-        }
-
-        public void Remove(Vector2 location)
-        {
-            highlights.Remove(location);
+            _highlights[location] = radius;
         }
 
         public void Clear()
         {
-            highlights.Clear();
+            _highlights.Clear();
         }
 
-        public void DrawHighlightedObjects(object sender, RenderedWorldEventArgs e)
+        public void DrawHighlightedObjects(RenderedWorldEventArgs e)
         {
-            foreach (var toDraw in highlights)
+            foreach (var toDraw in _highlights)
             {
                 DrawObject(e.SpriteBatch, toDraw.Key, toDraw.Value);
             }
         }
 
-        private void DrawObject(SpriteBatch spriteBatch, Vector2 tileLocation, int radius)
+        private static void DrawObject(SpriteBatch spriteBatch, Vector2 tileLocation, int radius)
         {
             var locations = GetLocationsInRadius(tileLocation, radius);
 
-            var cursorSize = 16;
+            const int cursorSize = 16;
 
-            foreach (Vector2 location in locations)
+            foreach (var location in locations)
             {
                 spriteBatch.Draw(
                     Game1.mouseCursors,
@@ -54,19 +49,21 @@ namespace ScarecrowHighlighter
             }
         }
 
-        private Vector2 TileToScreen(Vector2 location)
+        private static Vector2 TileToScreen(Vector2 location)
         {
-            return new Vector2(location.X * Game1.tileSize - Game1.viewport.X,
-                (location.Y * Game1.tileSize) - Game1.viewport.Y);
+            return new Vector2(
+                location.X * Game1.tileSize - Game1.viewport.X,
+                location.Y * Game1.tileSize - Game1.viewport.Y
+            );
         }
 
-        private List<Vector2> GetLocationsInRadius(Vector2 location, int radius)
+        private static List<Vector2> GetLocationsInRadius(Vector2 location, int radius)
         {
-            List<Vector2> locations = new List<Vector2>();
+            var locations = new List<Vector2>();
             for (float x = -radius; x <= radius; x++)
             {
-                float tilesRemoved = Math.Abs(x) - radius / 2f;
-                for (float y = Math.Max(-radius, -radius + tilesRemoved);
+                var tilesRemoved = Math.Abs(x) - radius / 2f;
+                for (var y = Math.Max(-radius, -radius + tilesRemoved);
                      y <= Math.Min(radius, radius - tilesRemoved);
                      y++)
                 {
