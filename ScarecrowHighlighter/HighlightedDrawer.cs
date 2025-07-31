@@ -57,21 +57,19 @@ namespace ScarecrowHighlighter
             );
         }
 
-        private static List<Vector2> GetLocationsInRadius(Vector2 location, int radius)
+        private static IEnumerable<Vector2> GetLocationsInRadius(Vector2 location, int radius)
         {
-            var locations = new List<Vector2>();
             for (float x = -radius; x <= radius; x++)
             {
-                var tilesRemoved = Math.Abs(x) - radius / 2f;
-                for (var y = Math.Max(-radius, -radius + tilesRemoved);
-                     y <= Math.Min(radius, radius - tilesRemoved);
-                     y++)
+                for (var y = -radius; y <= radius; y++)
                 {
-                    locations.Add(new Vector2(location.X + x, location.Y + y));
+                    var tileLocation = new Vector2(location.X + x, location.Y + y);
+                    if (Vector2.Distance(location, tileLocation) <= radius + 1)
+                    {
+                        yield return tileLocation;
+                    }
                 }
             }
-
-            return locations;
         }
     }
 }
