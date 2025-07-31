@@ -1,4 +1,5 @@
-﻿using StardewModdingAPI;
+﻿using Microsoft.Xna.Framework;
+using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using Object = StardewValley.Object;
@@ -12,7 +13,7 @@ public class ScarecrowHighlighterMod : Mod
     private ModConfig _config = null!;
 
     private readonly HighlightedDrawer _drawer = new();
-    private readonly Dictionary<string, int> _radiusByQualifiedId = new();
+    private readonly Dictionary<string, int> _radiusByQualifiedItemId = new();
 
     public override void Entry(IModHelper helper)
     {
@@ -26,7 +27,6 @@ public class ScarecrowHighlighterMod : Mod
         helper.Events.Display.RenderedWorld += DisplayHighlighting;
         helper.Events.Input.ButtonPressed += CheckToggleHighlightButton;
     }
-
 
     /// <summary>
     /// Builds a list of objects to highlight based on the name of registered items.
@@ -43,7 +43,7 @@ public class ScarecrowHighlighterMod : Mod
                 if (!data.InternalName.Contains("arecrow", StringComparison.OrdinalIgnoreCase)) continue;
 
                 var radius = data.InternalName.Contains("deluxe", StringComparison.OrdinalIgnoreCase) ? 17 : 9;
-                _radiusByQualifiedId.Add(data.QualifiedItemId, radius);
+                _radiusByQualifiedItemId.Add(data.QualifiedItemId, radius);
             }
         }
     }
@@ -87,20 +87,20 @@ public class ScarecrowHighlighterMod : Mod
 
     private void DisplayHighlighting(object? sender, RenderedWorldEventArgs e)
     {
-        _drawer.Clear();
+        List<(Vector2 location, string qualifiedItemId)> highlightedLocations = new();
 
         // Check if the object the cursor is above is a highlighted object
         var hovered = Game1.currentLocation.getObjectAtTile((int) Game1.currentCursorTile.X, (int) Game1.currentCursorTile.Y);
-        if (hovered != null && _radiusByQualifiedId.TryGetValue(hovered.QualifiedItemId, out var hoveredRadius))
+        if (hovered != null && _radiusByQualifiedItemId.ContainsKey(hovered.QualifiedItemId))
         {
-            _drawer.Add(hovered.TileLocation, hoveredRadius);
+            highlightedLocations.Add((hovered.TileLocation, hovered.QualifiedItemId));
         }
-        
+
         // Check if the player is holding a highlighted item
-        var holding = _radiusByQualifiedId.TryGetValue(Game1.player.CurrentItem.QualifiedItemId, out var holdingRadius);
+        var holding = _radiusByQualifiedItemId.ContainsKey(Game1.player.CurrentItem.QualifiedItemId);
         if (holding)
         {
-            _drawer.Add(Game1.currentCursorTile, holdingRadius);
+            highlightedLocations.Add((Game1.currentCursorTile, Game1.player.CurrentItem.QualifiedItemId));
         }
 
         // If the highlighting shouldn't be displayed, don't render it
@@ -108,13 +108,13 @@ public class ScarecrowHighlighterMod : Mod
 
         foreach (var worldObject in Game1.currentLocation.Objects.Values)
         {
-            if (_radiusByQualifiedId.TryGetValue(worldObject.QualifiedItemId, out var radius))
+            if (_radiusByQualifiedItemId.ContainsKey(worldObject.QualifiedItemId))
             {
-                _drawer.Add(worldObject.TileLocation, radius);
+                highlightedLocations.Add((worldObject.TileLocation, worldObject.QualifiedItemId));
             }
         }
 
-        _drawer.DrawHighlightedObjects(e);
+        _drawer.DrawHighlightedItems(e.SpriteBatch, _radiusByQualifiedItemId, highlightedLocations);
     }
 
     private void CheckToggleHighlightButton(object? sender, ButtonPressedEventArgs e)

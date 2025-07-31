@@ -1,52 +1,45 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using StardewModdingAPI.Events;
 using StardewValley;
 
 namespace ScarecrowHighlighter;
 
 public class HighlightedDrawer
 {
-    private readonly Dictionary<Vector2, int> _highlights = new();
-
-    public void Add(Vector2 location, int radius)
+    public void DrawHighlightedItems(SpriteBatch batch, Dictionary<string, int> radiusByQualifiedItemId, List<(Vector2 location, string qualifiedItemId)> items)
     {
-        _highlights[location] = radius;
-    }
+        var tiles = items
+            // Turn the list of objects' locations to a list of tiles to highlight
+            .SelectMany(item =>
+            {
+                var radius = radiusByQualifiedItemId[item.qualifiedItemId];
+                return GetLocationsInRadius(item.location, radius)
+                    .Select(location => item with { location = location });
+            })
+            // Do a lookup to collect all the items that affect this location
+            .ToLookup(x => x.location, x => x.qualifiedItemId);
 
-    public void Clear()
-    {
-        _highlights.Clear();
-    }
-
-    public void DrawHighlightedObjects(RenderedWorldEventArgs e)
-    {
-        foreach (var toDraw in _highlights)
+        foreach (var toDraw in tiles)
         {
-            DrawObject(e.SpriteBatch, toDraw.Key, toDraw.Value);
+            DrawTile(batch, toDraw.Key);
         }
     }
 
-    private static void DrawObject(SpriteBatch spriteBatch, Vector2 tileLocation, int radius)
+    private static void DrawTile(SpriteBatch spriteBatch, Vector2 tileLocation)
     {
-        var locations = GetLocationsInRadius(tileLocation, radius);
-
         const int cursorSize = 16;
 
-        foreach (var location in locations)
-        {
-            spriteBatch.Draw(
-                Game1.mouseCursors,
-                TileToScreen(location),
-                new Rectangle(194, 388, cursorSize, cursorSize),
-                Color.White,
-                0,
-                Vector2.Zero,
-                new Vector2(Game1.tileSize / (float) cursorSize),
-                SpriteEffects.None,
-                0
-            );
-        }
+        spriteBatch.Draw(
+            Game1.mouseCursors,
+            TileToScreen(tileLocation),
+            new Rectangle(194, 388, cursorSize, cursorSize),
+            Color.White,
+            0,
+            Vector2.Zero,
+            new Vector2(Game1.tileSize / (float) cursorSize),
+            SpriteEffects.None,
+            0
+        );
     }
 
     private static Vector2 TileToScreen(Vector2 location)
