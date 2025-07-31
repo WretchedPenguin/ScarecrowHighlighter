@@ -59,12 +59,12 @@ namespace ScarecrowHighlighter
 
         private static IEnumerable<Vector2> GetLocationsInRadius(Vector2 location, int radius)
         {
-            for (float x = -radius; x <= radius; x++)
+            for (float x = -radius; x < radius; x++)
             {
-                for (var y = -radius; y <= radius; y++)
+                for (var y = -radius; y < radius; y++)
                 {
                     var tileLocation = new Vector2(location.X + x, location.Y + y);
-                    if (Vector2.Distance(location, tileLocation) <= radius + 1)
+                    if (Vector2.Distance(location, tileLocation) < radius)
                     {
                         yield return tileLocation;
                     }

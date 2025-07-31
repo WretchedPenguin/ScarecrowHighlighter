@@ -15,18 +15,43 @@ namespace ScarecrowHighlighter
         private readonly HighlightedDrawer _drawer = new();
         private readonly Dictionary<Object, int> _itemsToHighlight = new();
 
+        private readonly Dictionary<string, int> _radiusByQualifiedId = new();
+
         public override void Entry(IModHelper helper)
         {
             I18n.Init(helper.Translation);
 
             _config = Helper.ReadConfig<ModConfig>();
 
+            helper.Events.GameLoop.GameLaunched += BuildHighlightingList;
             helper.Events.GameLoop.GameLaunched += RegisterModConfigMenu;
+
             helper.Events.Input.CursorMoved += InputOnCursorMoved;
             helper.Events.Display.RenderedWorld += DisplayOnRenderedWorld;
             helper.Events.World.ObjectListChanged += WorldOnObjectListChanged;
             helper.Events.Player.Warped += PlayerOnWarped;
             helper.Events.Input.ButtonPressed += CheckButtonPressed;
+        }
+
+
+        /// <summary>
+        /// Builds a list of objects to highlight based on the name of registered items.
+        /// The radius from the scarecrow is taken from the official method <see cref="Object.GetRadiusForScarecrow"/>
+        /// </summary>
+        private void BuildHighlightingList(object? sender, GameLaunchedEventArgs e)
+        {
+            foreach (var itemType in ItemRegistry.ItemTypes.Where(x => x.Identifier == "(BC)"))
+            {
+                foreach (var id in itemType.GetAllIds())
+                {
+                    var data = itemType.GetData(id);
+
+                    if (!data.InternalName.Contains("arecrow", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    var radius = data.InternalName.Contains("deluxe", StringComparison.OrdinalIgnoreCase) ? 17 : 9;
+                    _radiusByQualifiedId.Add(data.QualifiedItemId, radius);
+                }
+            }
         }
 
         private void RegisterModConfigMenu(object? sender, GameLaunchedEventArgs e)
@@ -84,18 +109,19 @@ namespace ScarecrowHighlighter
 
         private void CheckButtonPressed(object? sender, ButtonPressedEventArgs e)
         {
-            if (e.Button == _config.ToggleHighlightButton)
-                _pressed = !_pressed;
+            if (e.Button != _config.ToggleHighlightButton) return;
+
+            _pressed = !_pressed;
         }
 
         private bool CheckHoldingHighlight()
         {
-            if (!Context.IsWorldReady)
-                return false;
-            if (Game1.player.CurrentItem == null || !_config.HighlightOnHold)
-                return false;
+            if (!Context.IsWorldReady) return false;
+            if (Game1.player.CurrentItem == null) return false;
+            if (!_config.HighlightOnHold) return false;
 
-            var holding = MatchesSearchPattern(Game1.player.CurrentItem.Name, out var radius);
+            var holding = _radiusByQualifiedId.TryGetValue(Game1.player.CurrentItem.QualifiedItemId, out var radius);
+
             if (holding)
             {
                 _drawer.Add(Game1.currentCursorTile, radius);
@@ -108,7 +134,7 @@ namespace ScarecrowHighlighter
         {
             foreach (var obj in e.NewLocation.Objects.Values)
             {
-                if (MatchesSearchPattern(obj.Name, out var radius))
+                if (_radiusByQualifiedId.TryGetValue(obj.QualifiedItemId, out var radius))
                 {
                     _itemsToHighlight.Add(obj, radius);
                 }
@@ -117,11 +143,11 @@ namespace ScarecrowHighlighter
 
         private void WorldOnObjectListChanged(object? sender, ObjectListChangedEventArgs e)
         {
-            if (!e.IsCurrentLocation)
-                return;
+            if (!e.IsCurrentLocation) return;
+
             foreach (var added in e.Added)
             {
-                if (MatchesSearchPattern(added.Value.Name, out var radius))
+                if (_radiusByQualifiedId.TryGetValue(added.Value.QualifiedItemId, out var radius))
                 {
                     _itemsToHighlight.Add(added.Value, radius);
                 }
@@ -129,7 +155,7 @@ namespace ScarecrowHighlighter
 
             foreach (var removed in e.Removed)
             {
-                if (MatchesSearchPattern(removed.Value.Name, out _))
+                if (_radiusByQualifiedId.ContainsKey(removed.Value.QualifiedItemId))
                 {
                     _itemsToHighlight.Remove(removed.Value);
                 }
@@ -145,24 +171,9 @@ namespace ScarecrowHighlighter
             var tile = e.NewPosition.Tile;
             var hovered = Game1.currentLocation.getObjectAtTile((int) tile.X, (int) tile.Y);
             if (hovered == null) return;
-            if (!MatchesSearchPattern(hovered.Name, out _)) return;
+            if (!_radiusByQualifiedId.ContainsKey(hovered.QualifiedItemId)) return;
 
             _hovering = true;
-        }
-
-        private bool MatchesSearchPattern(string name, out int radius)
-        {
-            var searchItems = _config.SearchItems.OrderByDescending(s => s.SearchString.Length);
-            foreach (var searchItem in searchItems)
-            {
-                if (!name.Contains(searchItem.SearchString)) continue;
-
-                radius = searchItem.Radius;
-                return true;
-            }
-
-            radius = -1;
-            return false;
         }
     }
 }
